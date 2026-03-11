@@ -1,15 +1,17 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { ArrowLeft, Copy, CheckCircle2, Wallet, ExternalLink } from 'lucide-react';
+import { ArrowLeft, Copy, CheckCircle2, Wallet } from 'lucide-react';
 import { CRYPTO_ADDRESS } from '../constants';
 import { useAuth } from '../context/AuthContext';
+import { db } from '../firebase';
+import { collection, addDoc, doc, updateDoc, increment } from 'firebase/firestore';
 
 interface DepositScreenProps {
   onBack: () => void;
 }
 
 export default function DepositScreen({ onBack }: DepositScreenProps) {
-  const { user, refreshDashboard } = useAuth();
+  const { user } = useAuth();
   const [amount, setAmount] = useState('');
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -22,18 +24,25 @@ export default function DepositScreen({ onBack }: DepositScreenProps) {
   };
 
   const handleSubmit = async () => {
-    if (!amount) return;
+    if (!amount || !user) return;
     setLoading(true);
     try {
-      const res = await fetch('/api/transactions/deposit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user?.id, amount: parseFloat(amount) })
+      const numAmount = parseFloat(amount);
+      // Add transaction
+      await addDoc(collection(db, 'transactions'), {
+        userId: user.id,
+        type: 'deposit',
+        amount: numAmount,
+        status: 'completed',
+        created_at: new Date().toISOString()
       });
-      if (res.ok) {
-        setStep(3);
-        refreshDashboard();
-      }
+      
+      // Update user balance
+      await updateDoc(doc(db, 'users', user.id as any), {
+        balance: increment(numAmount)
+      });
+
+      setStep(3);
     } catch (err) {
       console.error(err);
     } finally {

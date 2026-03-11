@@ -1,0 +1,58 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile and financial data",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "balance": { "type": "number" },
+        "profit": { "type": "number" },
+        "referral_code": { "type": "string" },
+        "activeInvestment": { "type": "number" }
+      },
+      "required": ["name", "email", "balance", "profit"]
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "Financial transaction record",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "type": { "type": "string", "enum": ["deposit", "withdraw", "invest", "profit"] },
+        "amount": { "type": "number" },
+        "status": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Investment": {
+      "title": "Investment",
+      "description": "Active investment record",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "planName": { "type": "string" },
+        "amount": { "type": "number" },
+        "profitRate": { "type": "number" },
+        "status": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" }
+      }
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile data"
+    },
+    "/transactions/{txId}": {
+      "schema": "Transaction",
+      "description": "Transaction logs"
+    },
+    "/investments/{invId}": {
+      "schema": "Investment",
+      "description": "Investment records"
+    }
+  }
+}

@@ -1,11 +1,12 @@
 export interface User {
-  id: number;
+  id: string;
   name: string;
   email: string;
   phone: string;
   balance: number;
   profit: number;
   referral_code: string;
+  activeInvestment?: number;
 }
 
 export interface DashboardData {

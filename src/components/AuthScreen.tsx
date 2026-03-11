@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { ArrowLeft, Mail, Lock, User, Phone } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
+import { ArrowLeft, Mail, Lock, User as UserIcon, Phone } from 'lucide-react';
+import { auth, db } from '../firebase';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
+import { doc, setDoc } from 'firebase/firestore';
 
 interface AuthScreenProps {
   mode: 'login' | 'signup';
@@ -9,7 +11,6 @@ interface AuthScreenProps {
 }
 
 export default function AuthScreen({ mode, onBack }: AuthScreenProps) {
-  const { login } = useAuth();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -24,23 +25,28 @@ export default function AuthScreen({ mode, onBack }: AuthScreenProps) {
     setLoading(true);
     setError('');
 
-    const endpoint = mode === 'login' ? '/api/auth/login' : '/api/auth/register';
-    
     try {
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
-      });
-      const data = await res.json();
-
-      if (res.ok) {
-        login(data);
+      if (mode === 'signup') {
+        const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
+        const user = userCredential.user;
+        
+        // Create user document in Firestore
+        const referralCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+        await setDoc(doc(db, 'users', user.uid), {
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone,
+          balance: 0,
+          profit: 0,
+          activeInvestment: 0,
+          referral_code: referralCode,
+          created_at: new Date().toISOString()
+        });
       } else {
-        setError(data.error || 'Something went wrong');
+        await signInWithEmailAndPassword(auth, formData.email, formData.password);
       }
-    } catch (err) {
-      setError('Connection failed');
+    } catch (err: any) {
+      setError(err.message || 'Authentication failed');
     } finally {
       setLoading(false);
     }
@@ -66,7 +72,7 @@ export default function AuthScreen({ mode, onBack }: AuthScreenProps) {
         <form onSubmit={handleSubmit} className="space-y-4">
           {mode === 'signup' && (
             <div className="relative">
-              <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={20} />
+              <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={20} />
               <input
                 type="text"
                 placeholder="Full Name"

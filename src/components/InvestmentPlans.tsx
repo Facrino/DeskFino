@@ -3,20 +3,22 @@ import { motion } from 'motion/react';
 import { ArrowLeft, Zap, Shield, Crown, CheckCircle2 } from 'lucide-react';
 import { INVESTMENT_PLANS } from '../constants';
 import { useAuth } from '../context/AuthContext';
+import { db } from '../firebase';
+import { collection, addDoc, doc, updateDoc, increment } from 'firebase/firestore';
 
 interface InvestmentPlansProps {
   onBack: () => void;
 }
 
 export default function InvestmentPlans({ onBack }: InvestmentPlansProps) {
-  const { user, refreshDashboard } = useAuth();
+  const { user } = useAuth();
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
   const [amount, setAmount] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
 
   const handleInvest = async () => {
-    if (!selectedPlan || !amount) return;
+    if (!selectedPlan || !amount || !user) return;
     const plan = INVESTMENT_PLANS.find(p => p.id === selectedPlan)!;
     const numAmount = parseFloat(amount);
 
@@ -25,28 +27,42 @@ export default function InvestmentPlans({ onBack }: InvestmentPlansProps) {
       return;
     }
 
+    if (numAmount > user.balance) {
+      setMessage({ type: 'error', text: 'Insufficient balance' });
+      return;
+    }
+
     setLoading(true);
     try {
-      const res = await fetch('/api/invest', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: user?.id,
-          planName: plan.name,
-          amount: numAmount,
-          profitRate: plan.profit
-        })
+      // Create investment
+      await addDoc(collection(db, 'investments'), {
+        userId: user.id,
+        planName: plan.name,
+        amount: numAmount,
+        profitRate: plan.profit,
+        status: 'active',
+        created_at: new Date().toISOString()
       });
-      const data = await res.json();
-      if (res.ok) {
-        setMessage({ type: 'success', text: 'Investment successful!' });
-        refreshDashboard();
-        setTimeout(onBack, 2000);
-      } else {
-        setMessage({ type: 'error', text: data.error });
-      }
-    } catch (err) {
-      setMessage({ type: 'error', text: 'Failed to process investment' });
+
+      // Add transaction
+      await addDoc(collection(db, 'transactions'), {
+        userId: user.id,
+        type: 'invest',
+        amount: numAmount,
+        status: 'completed',
+        created_at: new Date().toISOString()
+      });
+
+      // Update user balance and active investment
+      await updateDoc(doc(db, 'users', user.id as any), {
+        balance: increment(-numAmount),
+        activeInvestment: increment(numAmount)
+      });
+
+      setMessage({ type: 'success', text: 'Investment successful!' });
+      setTimeout(onBack, 2000);
+    } catch (err: any) {
+      setMessage({ type: 'error', text: err.message || 'Failed to process investment' });
     } finally {
       setLoading(false);
     }

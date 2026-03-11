@@ -2,20 +2,22 @@ import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { ArrowLeft, Wallet, CheckCircle2, AlertCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { db } from '../firebase';
+import { collection, addDoc, doc, updateDoc, increment } from 'firebase/firestore';
 
 interface WithdrawScreenProps {
   onBack: () => void;
 }
 
 export default function WithdrawScreen({ onBack }: WithdrawScreenProps) {
-  const { dashboard, refreshDashboard } = useAuth();
+  const { user, dashboard } = useAuth();
   const [amount, setAmount] = useState('');
   const [address, setAddress] = useState('');
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState(1);
   const [error, setError] = useState('');
 
-  const handleWithdraw = () => {
+  const handleWithdraw = async () => {
     const numAmount = parseFloat(amount);
     if (!numAmount || numAmount < 11) {
       setError('Minimum withdrawal is $11.00');
@@ -29,14 +31,31 @@ export default function WithdrawScreen({ onBack }: WithdrawScreenProps) {
       setError('Please enter your USDT address');
       return;
     }
+    if (!user) return;
 
     setLoading(true);
-    // Simulate withdrawal request
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      // Add transaction
+      await addDoc(collection(db, 'transactions'), {
+        userId: user.id,
+        type: 'withdraw',
+        amount: numAmount,
+        status: 'pending',
+        address: address,
+        created_at: new Date().toISOString()
+      });
+
+      // Update user balance
+      await updateDoc(doc(db, 'users', user.id as any), {
+        balance: increment(-numAmount)
+      });
+
       setStep(2);
-      refreshDashboard();
-    }, 2000);
+    } catch (err: any) {
+      setError(err.message || 'Withdrawal failed');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
